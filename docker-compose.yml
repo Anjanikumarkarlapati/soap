@@ -1,0 +1,143 @@
+# EduPulse Academy - full platform stack
+# Usage:  docker compose up --build
+#
+# NOTE: MySQL is NOT published to the host (port 3306 is often taken by a local
+# MySQL install). Inspect it with:
+#   docker compose exec mysql mysql -uroot -proot
+# To expose it to the host, uncomment the "ports" block under mysql.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: edupulse-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    # ports:
+    #   - "3306:3306"
+
+  eureka-server:
+    build:
+      context: ./backend
+      dockerfile: eureka-server/Dockerfile
+    container_name: edupulse-eureka
+    ports:
+      - "8761:8761"
+
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: auth-service/Dockerfile
+    container_name: edupulse-auth
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:-eduPulseSuperSecretKeyForJWTSigningMinimum256BitsLongForHS256}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    ports:
+      - "8081:8081"
+
+  student-service:
+    build:
+      context: ./backend
+      dockerfile: student-service/Dockerfile
+    container_name: edupulse-student
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:-eduPulseSuperSecretKeyForJWTSigningMinimum256BitsLongForHS256}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    ports:
+      - "8082:8082"
+
+  attendance-service:
+    build:
+      context: ./backend
+      dockerfile: attendance-service/Dockerfile
+    container_name: edupulse-attendance
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:-eduPulseSuperSecretKeyForJWTSigningMinimum256BitsLongForHS256}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    ports:
+      - "8083:8083"
+
+  result-service:
+    build:
+      context: ./backend
+      dockerfile: result-service/Dockerfile
+    container_name: edupulse-result
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      EUREKA_URI: http://eureka-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:-eduPulseSuperSecretKeyForJWTSigningMinimum256BitsLongForHS256}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    ports:
+      - "8084:8084"
+
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
+    container_name: edupulse-gateway
+    environment:
+      EUREKA_URI: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+      - auth-service
+      - student-service
+      - attendance-service
+      - result-service
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser calls the gateway on the host, hence localhost:8080
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080/api
+    container_name: edupulse-frontend
+    depends_on:
+      - api-gateway
+    ports:
+      - "3000:3000"
+
+volumes:
+  mysql-data:
