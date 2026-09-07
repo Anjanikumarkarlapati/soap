@@ -48,6 +48,19 @@
     </dependencyManagement>
 
     <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- Without spring-boot-starter-parent, -parameters must be
+                         enabled explicitly or @PathVariable/@RequestParam without
+                         explicit names fail at runtime -->
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
         <pluginManagement>
             <plugins>
                 <plugin>
